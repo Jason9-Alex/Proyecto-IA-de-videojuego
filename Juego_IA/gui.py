@@ -1,4 +1,3 @@
-
 # gui.py
 import tkinter as tk
 from tkinter import messagebox, ttk
@@ -11,6 +10,7 @@ import pygame
 import engine
 import ai
 from models import Card
+from data_logger import GameLogger
 from config import *
 
 class TripleTriadGUI:
@@ -30,11 +30,14 @@ class TripleTriadGUI:
         self.deck_red = None
         self.last_move = None
         self.asset_dir = Path(__file__).resolve().parent
+        self.game_logger = GameLogger()
         self.choice_image_cache = {}
         self.card_image_cache = {}
         self.sound_cache = {}
         self.audio_ready = False
         self.init_audio()
+
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
         self.root.after(100, self.show_welcome_screen)
 
@@ -321,7 +324,7 @@ class TripleTriadGUI:
         return preview_frame
 
     def ask_difficulty(self):
-        dialog = self.styled_dialog("Dificultad - Triple Triad", 460, 320)
+        dialog = self.styled_dialog("Dificultad - Triple Triad", 460, 380)
         self.gold_header(dialog, "LEGIONS · TRIPLE TRIAD", "Selecciona la dificultad de la IA")
 
         def set_diff(level):
@@ -332,6 +335,7 @@ class TripleTriadGUI:
         self.styled_button(dialog, "Nivel I · Aprendiz Arcano (Aleatorio)", lambda: set_diff(1), width=38, height=2).pack(pady=6)
         self.styled_button(dialog, "Nivel II · Hechicero (Greedy)", lambda: set_diff(2), width=38, height=2).pack(pady=6)
         self.styled_button(dialog, "Nivel III · Señor Oscuro (Minimax)", lambda: set_diff(3), danger=True, width=38, height=2).pack(pady=6)
+        self.styled_button(dialog, "Nivel IV · Aprendizaje Automático (ML)", lambda: set_diff(4), primary=True, width=38, height=2).pack(pady=6)
 
     def ask_deck_blue(self):
         dialog = self.styled_dialog("Elige tu personaje", 800, 860)
@@ -446,6 +450,7 @@ class TripleTriadGUI:
             self.hand_blue = self.build_hand(self.deck_blue, "A")
             self.hand_red = self.build_hand(self.deck_red, "R")
             self.HAND_SIZE = max(len(self.hand_blue), len(self.hand_red))
+            self.game_logger.start_game()
 
             self.create_interface()
         except Exception as e:
@@ -456,9 +461,14 @@ class TripleTriadGUI:
             child.destroy()
 
     def restart_game(self):
+        self.game_logger.discard_game()
         self.clear_game_ui()
         self.root.withdraw()
         self.show_welcome_screen(self.ask_difficulty)
+
+    def on_close(self):
+        self.game_logger.discard_game()
+        self.root.quit()
 
     def build_hand(self, deck_names, prefix):
         cards = []
@@ -697,6 +707,9 @@ class TripleTriadGUI:
         if self.current_player != "Azul" or self.selected_card_idx is None: return
         if self.board[x][y] is not None: return
 
+        self.game_logger.log_human_move(self.board, self.bombs, self.hand_blue, len(self.hand_red),
+                                        x, y, self.selected_card_idx, self.ROWS, self.COLS)
+
         self.last_move = {
             'hand_blue': copy.deepcopy(self.hand_blue), 'hand_red': copy.deepcopy(self.hand_red),
             'board': copy.deepcopy(self.board), 'bombs': copy.deepcopy(self.bombs)
@@ -751,6 +764,7 @@ class TripleTriadGUI:
 
     def undo_last_move(self):
         if not self.last_move or self.current_player != "Azul": return
+        self.game_logger.discard_last_move()
         self.hand_blue = self.last_move['hand_blue']
         self.hand_red = self.last_move['hand_red']
         self.board = self.last_move['board']
@@ -763,6 +777,7 @@ class TripleTriadGUI:
     def end_game(self):
         azul = sum(1 for r in self.board for c in r if c and c[0] == "Azul")
         rojo = sum(1 for r in self.board for c in r if c and c[0] == "Rojo")
+        self.game_logger.finalize_game(azul, rojo)
         if azul > rojo:
             winner_text = "Ganaste tú (Azul)"
             loser_text = "Perdió la IA (Rojo)"

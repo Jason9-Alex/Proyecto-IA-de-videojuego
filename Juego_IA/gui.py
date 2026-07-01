@@ -690,7 +690,6 @@ class TripleTriadGUI:
     def select_card(self, idx):
         if self.current_player != "Azul": return
         self.selected_card_idx = idx
-        self.play_card_sound(self.hand_blue[idx])
         self.refresh_hand()
         self.status_label.config(text=f"✧ Carta {self.hand_blue[idx].name} imbuida → Elige una casilla ✧", fg=SELECT_GOLD)
 

@@ -6,6 +6,7 @@ import random
 import copy
 from pathlib import Path
 from PIL import Image, ImageTk
+import pygame
 
 import engine
 import ai
@@ -31,8 +32,45 @@ class TripleTriadGUI:
         self.asset_dir = Path(__file__).resolve().parent
         self.choice_image_cache = {}
         self.card_image_cache = {}
+        self.sound_cache = {}
+        self.audio_ready = False
+        self.init_audio()
 
         self.root.after(100, self.show_welcome_screen)
+
+    def init_audio(self):
+        try:
+            if not pygame.mixer.get_init():
+                pygame.mixer.init()
+            self.audio_ready = True
+        except Exception:
+            self.audio_ready = False
+
+    def get_card_sound_path(self, card):
+        special = getattr(card, "special", None)
+        if special == "comun":
+            return self.asset_dir / "caballero comun.mp3"
+        if special:
+            return self.asset_dir / f"{special}.mp3"
+        return None
+
+    def play_card_sound(self, card):
+        if not self.audio_ready:
+            return
+
+        sound_path = self.get_card_sound_path(card)
+        if not sound_path or not sound_path.exists():
+            return
+
+        cache_key = str(sound_path)
+        try:
+            sound = self.sound_cache.get(cache_key)
+            if sound is None:
+                sound = pygame.mixer.Sound(cache_key)
+                self.sound_cache[cache_key] = sound
+            sound.play()
+        except Exception:
+            self.audio_ready = False
 
     def center_window(self, width=None, height=None):
         self.root.update_idletasks()
@@ -136,7 +174,8 @@ class TripleTriadGUI:
         if cache_key in self.choice_image_cache:
             return self.choice_image_cache[cache_key]
 
-        image_path = self.asset_dir / f"{deck_name}.jpg"
+        image_name = "caballero.jpg" if deck_name == "comun" else f"{deck_name}.jpg"
+        image_path = self.asset_dir / image_name
         try:
             image = Image.open(image_path).convert("RGB")
         except Exception:
@@ -201,11 +240,14 @@ class TripleTriadGUI:
         if cache_key in self.card_image_cache:
             return self.card_image_cache[cache_key]
 
-        image_path = self.asset_dir / f"{deck_name}_8" / f"{deck_name}_{card_index}.jpg"
+        if deck_name == "comun":
+            image_path = self.asset_dir / "caballero.jpg"
+        else:
+            image_path = self.asset_dir / f"{deck_name}_8" / f"{deck_name}_{card_index}.jpg"
         try:
             image = Image.open(image_path).convert("RGB")
         except Exception:
-            return None
+            image = Image.new("RGB", size, color=BG_PANEL_LIGHT)
 
         resample = getattr(Image, "Resampling", Image).LANCZOS
         image.thumbnail(size, resample)
@@ -215,7 +257,7 @@ class TripleTriadGUI:
 
     def load_card_image(self, card, size=(96, 64), display_deck_name=None):
         special = getattr(card, "special", None)
-        deck_name = special if special and special != "comun" else display_deck_name
+        deck_name = special if special else display_deck_name
         if not deck_name:
             return None
 
@@ -648,6 +690,7 @@ class TripleTriadGUI:
     def select_card(self, idx):
         if self.current_player != "Azul": return
         self.selected_card_idx = idx
+        self.play_card_sound(self.hand_blue[idx])
         self.refresh_hand()
         self.status_label.config(text=f"✧ Carta {self.hand_blue[idx].name} imbuida → Elige una casilla ✧", fg=SELECT_GOLD)
 
@@ -663,6 +706,7 @@ class TripleTriadGUI:
         card = self.hand_blue.pop(self.selected_card_idx)
         self.board[x][y] = ("Azul", card)
         self.selected_card_idx = None
+        self.play_card_sound(card)
 
         self.resolve_and_update(x, y, "Azul")
 
@@ -690,10 +734,11 @@ class TripleTriadGUI:
             return
 
         empty_cells = [(i, j) for i in range(self.ROWS) for j in range(self.COLS) if self.board[i][j] is None]
-        pos, card_idx = ai.select_ai_move(self.difficulty, self.board, self.hand_red, empty_cells, self.ROWS, self.COLS)
+        pos, card_idx = ai.select_ai_move(self.difficulty, self.board, self.bombs, self.hand_red, empty_cells, self.ROWS, self.COLS)
 
         card = self.hand_red.pop(card_idx)
         self.board[pos[0]][pos[1]] = ("Rojo", card)
+        self.play_card_sound(card)
 
         self.resolve_and_update(pos[0], pos[1], "Rojo")
 

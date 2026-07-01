@@ -696,6 +696,11 @@ class TripleTriadGUI:
         self.board[pos[0]][pos[1]] = ("Rojo", card)
 
         self.resolve_and_update(pos[0], pos[1], "Rojo")
+
+        if len(self.hand_blue) == 0 and len(self.hand_red) == 0:
+            self.end_game()
+            return
+
         self.current_player = "Azul"
         self.status_label.config(text="✧ Tu turno (Azul). Defiende tu posición. ✧", fg=TEXT_RUNE)
         self.refresh_all()
@@ -714,8 +719,35 @@ class TripleTriadGUI:
     def end_game(self):
         azul = sum(1 for r in self.board for c in r if c and c[0] == "Azul")
         rojo = sum(1 for r in self.board for c in r if c and c[0] == "Rojo")
-        msg = f"¡LA VICTORIA ES TUYA! 🏆" if azul > rojo else (f"EL REINO HA CAÍDO ☠️" if rojo > azul else f"EMPATE MÁGICO ⚖️")
-        
-        dialog = self.styled_dialog("Resolución de la Batalla", 560, 360)
-        tk.Label(dialog, text=msg, font=FONT_TITLE, fg=TEXT_RUNE, bg=BG_DARK).pack(pady=40)
-        self.styled_button(dialog, "Volver al menú", lambda: [dialog.destroy(), self.restart_game()], primary=True).pack()
+        if azul > rojo:
+            winner_text = "Ganaste tú (Azul)"
+            loser_text = "Perdió la IA (Rojo)"
+            summary = f"Azul {azul} - {rojo} Rojo"
+        elif rojo > azul:
+            winner_text = "Ganó la IA (Rojo)"
+            loser_text = "Perdiste tú (Azul)"
+            summary = f"Rojo {rojo} - {azul} Azul"
+        else:
+            winner_text = "Empate"
+            loser_text = "Ninguno perdió ni ganó"
+            summary = f"Azul {azul} - {rojo} Rojo"
+
+        dialog = self.styled_dialog("Resolución de la Batalla", 620, 400)
+        self.gold_header(dialog, "FIN DE LA PARTIDA", summary, fg=TEXT_RUNE)
+
+        tk.Label(dialog, text=winner_text, font=FONT_TITLE, fg=BLUE_ACCENT if azul >= rojo else RED_ACCENT, bg=BG_DARK).pack(pady=(20, 6))
+        tk.Label(dialog, text=loser_text, font=FONT_SUBTITLE, fg=TEXT_MUTED, bg=BG_DARK).pack(pady=(0, 18))
+
+        button_row = tk.Frame(dialog, bg=BG_DARK)
+        button_row.pack(pady=10)
+
+        def play_again():
+            dialog.destroy()
+            self.restart_game()
+
+        def exit_game():
+            dialog.destroy()
+            self.root.quit()
+
+        self.styled_button(button_row, "Jugar de nuevo", play_again, primary=True, width=18, height=2).pack(side="left", padx=10)
+        self.styled_button(button_row, "Salir", exit_game, danger=True, width=12, height=2).pack(side="left", padx=10)

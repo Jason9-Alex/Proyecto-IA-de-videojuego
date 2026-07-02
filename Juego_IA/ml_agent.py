@@ -12,26 +12,57 @@ Si el modelo todavia no fue entrenado (no existen los archivos .pkl), este
 agente cae automaticamente al modo Greedy para que el juego nunca se rompa.
 """
 import os
+from pathlib import Path
 import joblib
 
 from features import build_feature_vector
 
-MODEL_PATH = "ml_model.pkl"
-SCALER_PATH = "scaler.pkl"
+BASE_DIR = Path(__file__).resolve().parent
+MODEL_PATH = BASE_DIR / "ml_model.pkl"
+SCALER_PATH = BASE_DIR / "scaler.pkl"
 
 _model = None
 _scaler = None
-_load_attempted = False
+_loaded_model_mtime = None
+_loaded_scaler_mtime = None
+
+
+def _current_mtime(path):
+    try:
+        return path.stat().st_mtime
+    except FileNotFoundError:
+        return None
 
 
 def _load_model():
-    global _model, _scaler, _load_attempted
-    if _load_attempted:
+    global _model, _scaler, _loaded_model_mtime, _loaded_scaler_mtime
+    model_mtime = _current_mtime(MODEL_PATH)
+    scaler_mtime = _current_mtime(SCALER_PATH)
+
+    if model_mtime is None or scaler_mtime is None:
+        _model = None
+        _scaler = None
+        _loaded_model_mtime = None
+        _loaded_scaler_mtime = None
         return
-    _load_attempted = True
+
+    if (
+        _model is not None
+        and _loaded_model_mtime == model_mtime
+        and _loaded_scaler_mtime == scaler_mtime
+    ):
+        return
+
     if os.path.isfile(MODEL_PATH) and os.path.isfile(SCALER_PATH):
         _model = joblib.load(MODEL_PATH)
         _scaler = joblib.load(SCALER_PATH)
+        _loaded_model_mtime = model_mtime
+        _loaded_scaler_mtime = scaler_mtime
+
+
+def refresh_model():
+    """Fuerza una recarga del modelo si los archivos entrenados cambiaron."""
+    _load_model()
 
 
 def is_available():

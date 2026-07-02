@@ -3,6 +3,9 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 import random
 import copy
+import subprocess
+import sys
+import threading
 from pathlib import Path
 from PIL import Image, ImageTk
 import pygame
@@ -35,6 +38,7 @@ class TripleTriadGUI:
         self.card_image_cache = {}
         self.sound_cache = {}
         self.audio_ready = False
+        self.model_training_in_progress = False
         self.init_audio()
 
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -48,6 +52,33 @@ class TripleTriadGUI:
             self.audio_ready = True
         except Exception:
             self.audio_ready = False
+
+    def schedule_model_retraining(self):
+        if self.model_training_in_progress:
+            return
+
+        self.model_training_in_progress = True
+
+        def run_training():
+            try:
+                subprocess.run(
+                    [sys.executable, str(self.asset_dir / "train_model.py")],
+                    cwd=str(self.asset_dir),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+            except Exception as exc:
+                print(f"Auto-entrenamiento fallo: {exc}")
+            finally:
+                self.model_training_in_progress = False
+                try:
+                    import ml_agent
+                    ml_agent.refresh_model()
+                except Exception:
+                    pass
+
+        threading.Thread(target=run_training, daemon=True).start()
 
     def get_card_sound_path(self, card):
         special = getattr(card, "special", None)
@@ -746,7 +777,16 @@ class TripleTriadGUI:
             return
 
         empty_cells = [(i, j) for i in range(self.ROWS) for j in range(self.COLS) if self.board[i][j] is None]
-        pos, card_idx = ai.select_ai_move(self.difficulty, self.board, self.bombs, self.hand_red, empty_cells, self.ROWS, self.COLS)
+        pos, card_idx = ai.select_ai_move(
+            self.difficulty,
+            self.board,
+            self.bombs,
+            self.hand_red,
+            empty_cells,
+            self.ROWS,
+            self.COLS,
+            len(self.hand_blue),
+        )
 
         card = self.hand_red.pop(card_idx)
         self.board[pos[0]][pos[1]] = ("Rojo", card)
@@ -778,6 +818,7 @@ class TripleTriadGUI:
         azul = sum(1 for r in self.board for c in r if c and c[0] == "Azul")
         rojo = sum(1 for r in self.board for c in r if c and c[0] == "Rojo")
         self.game_logger.finalize_game(azul, rojo)
+        self.schedule_model_retraining()
         if azul > rojo:
             winner_text = "Ganaste tú (Azul)"
             loser_text = "Perdió la IA (Rojo)"

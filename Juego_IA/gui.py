@@ -767,7 +767,7 @@ class TripleTriadGUI:
         engine.apply_bandido_attack(self.board, x, y, owner, self.ROWS, self.COLS)
         engine.process_captures_from_new_card(self.board, x, y, owner, self.ROWS, self.COLS)
         engine.apply_bombardero_bombs(self.board, self.bombs, x, y, owner, self.ROWS, self.COLS)
-        engine.apply_alien_growth(self.board, self.deck_blue, self.deck_red)
+        engine.apply_alien_growth(self.hand_blue, self.hand_red)
         self.refresh_board()
         self.undo_button.config(state="normal" if owner == "Azul" else "disabled")
 

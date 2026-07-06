@@ -74,21 +74,19 @@ def apply_bombardero_bombs(board, bombs, x, y, owner, rows, cols):
         if 0 <= nx < rows and 0 <= ny < cols and board[nx][ny] is None:
             bombs[(nx, ny)] = bombs.get((nx, ny), 0) + 1
 
-def _grow_board_owner(board, owner):
-    for row in board:
-        for cell in row:
-            if cell and cell[0] == owner and getattr(cell[1], 'special', None) == 'alien':
-                c = cell[1]
-                c.up = min(MAX_STAT, c.up + 1)
-                c.down = min(MAX_STAT, c.down + 1)
-                c.left = min(MAX_STAT, c.left + 1)
-                c.right = min(MAX_STAT, c.right + 1)
+def _grow_hand_aliens(hand):
+    for card in hand:
+        if getattr(card, 'special', None) == 'alien':
+            card.up = min(MAX_STAT, card.up + 1)
+            card.down = min(MAX_STAT, card.down + 1)
+            card.left = min(MAX_STAT, card.left + 1)
+            card.right = min(MAX_STAT, card.right + 1)
 
-def apply_alien_growth(board, deck_blue, deck_red):
-    if "alien" in deck_blue:
-        _grow_board_owner(board, "Azul")
-    if "alien" in deck_red:
-        _grow_board_owner(board, "Rojo")
+def apply_alien_growth(hand_blue, hand_red):
+    # Las cartas alien solo crecen mientras siguen en la mano/mazo (sin jugar).
+    # Una vez colocadas en el tablero, dejan de subir de nivel.
+    _grow_hand_aliens(hand_blue)
+    _grow_hand_aliens(hand_red)
 
 def process_captures_from_new_card(board, x, y, owner, rows, cols):
     if not board[x][y] or board[x][y][0] != owner:

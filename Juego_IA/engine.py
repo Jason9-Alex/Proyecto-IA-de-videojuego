@@ -50,17 +50,6 @@ def apply_bomb_trigger(board, bombs, x, y, owner, rows, cols):
     card.left = max(0, card.left - bomb_count)
     card.right = max(0, card.right - bomb_count)
 
-    directions = [(-1, 0, 'up', 'down'), (1, 0, 'down', 'up'),
-                  (0, -1, 'left', 'right'), (0, 1, 'right', 'left')]
-    for dx, dy, my_side, opp_side in directions:
-        nx, ny = x + dx, y + dy
-        if 0 <= nx < rows and 0 <= ny < cols and board[nx][ny]:
-            n_owner, n_card = board[nx][ny]
-            if n_owner != owner:
-                if getattr(n_card, opp_side) > getattr(card, my_side):
-                    board[x][y] = (n_owner, card)
-                    break
-
 def apply_bombardero_bombs(board, bombs, x, y, owner, rows, cols):
     if not board[x][y] or board[x][y][0] != owner:
         return
@@ -68,7 +57,9 @@ def apply_bombardero_bombs(board, bombs, x, y, owner, rows, cols):
     if getattr(card, 'special', None) != 'bombardero':
         return
 
-    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+    directions = [(-1, -1), (-1, 0), (-1, 1),
+                  (0, -1),           (0, 1),
+                  (1, -1),  (1, 0),  (1, 1)]
     for dx, dy in directions:
         nx, ny = x + dx, y + dy
         if 0 <= nx < rows and 0 <= ny < cols and board[nx][ny] is None:
